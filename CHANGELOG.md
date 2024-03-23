@@ -1,4 +1,9 @@
+
 # ChangeLog
+## [2042-03-23]
+### `llama-index-integrations/llms/llama-index-llms-llama-cpp/llama-index/llms/llama_cpp/base.py`
+- Thêm hàm `embed()` để tối ưu chỉ gọi 1 lần khi tạo luồng RAG custom, line (#257,#266)
+- Khai báo thêm tham số `embedding`, line (#79,#102,#105)
 
 ## [2024-03-21]
 

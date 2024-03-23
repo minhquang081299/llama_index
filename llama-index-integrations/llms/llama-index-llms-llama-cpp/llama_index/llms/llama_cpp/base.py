@@ -1,5 +1,5 @@
 import os
-from typing import Any, Callable, Dict, Optional, Sequence
+from typing import Any, Callable, Dict, Optional, Sequence, List
 
 import requests
 from llama_index.core.base.llms.types import (
@@ -28,6 +28,7 @@ from llama_index.core.utils import get_cache_dir
 from tqdm import tqdm
 
 from llama_cpp import Llama
+import llama_cpp
 
 DEFAULT_LLAMA_CPP_GGML_MODEL = (
     "https://huggingface.co/TheBloke/Llama-2-13B-chat-GGML/resolve"
@@ -40,60 +41,8 @@ DEFAULT_LLAMA_CPP_GGUF_MODEL = (
 DEFAULT_LLAMA_CPP_MODEL_VERBOSITY = True
 
 
+
 class LlamaCPP(CustomLLM):
-    r"""LlamaCPP LLM.
-
-    Examples:
-        Install llama-cpp-python following instructions:
-        https://github.com/abetlen/llama-cpp-python
-
-        Then `pip install llama-index-llms-llama-cpp`
-
-        ```python
-        from llama_index.llms.llama_cpp import LlamaCPP
-
-        def messages_to_prompt(messages):
-            prompt = ""
-            for message in messages:
-                if message.role == 'system':
-                prompt += f"<|system|>\n{message.content}</s>\n"
-                elif message.role == 'user':
-                prompt += f"<|user|>\n{message.content}</s>\n"
-                elif message.role == 'assistant':
-                prompt += f"<|assistant|>\n{message.content}</s>\n"
-
-            # ensure we start with a system prompt, insert blank if needed
-            if not prompt.startswith("<|system|>\n"):
-                prompt = "<|system|>\n</s>\n" + prompt
-
-            # add final assistant prompt
-            prompt = prompt + "<|assistant|>\n"
-
-            return prompt
-
-        def completion_to_prompt(completion):
-            return f"<|system|>\n</s>\n<|user|>\n{completion}</s>\n<|assistant|>\n"
-
-        model_url = "https://huggingface.co/TheBloke/zephyr-7B-beta-GGUF/resolve/main/zephyr-7b-beta.Q4_0.gguf"
-
-        llm = LlamaCPP(
-            model_url=model_url,
-            model_path=None,
-            temperature=0.1,
-            max_new_tokens=256,
-            context_window=3900,
-            generate_kwargs={},
-            model_kwargs={"n_gpu_layers": -1},  # if compiled to use GPU
-            messages_to_prompt=messages_to_prompt,
-            completion_to_prompt=completion_to_prompt,
-            verbose=True,
-        )
-
-        response = llm.complete("Hello, how are you?")
-        print(str(response))
-        ```
-    """
-
     model_url: Optional[str] = Field(
         description="The URL llama-cpp model to download and use."
     )
@@ -126,6 +75,11 @@ class LlamaCPP(CustomLLM):
         default=DEFAULT_LLAMA_CPP_MODEL_VERBOSITY,
         description="Whether to print verbose output.",
     )
+    # Difine embedding bool
+    embedding: bool = Field(
+                                    default=False,
+        description="Cho phép embedd text"
+    )
 
     _model: Any = PrivateAttr()
 
@@ -145,9 +99,10 @@ class LlamaCPP(CustomLLM):
         completion_to_prompt: Optional[Callable[[str], str]] = None,
         pydantic_program_mode: PydanticProgramMode = PydanticProgramMode.DEFAULT,
         output_parser: Optional[BaseOutputParser] = None,
+        embedding: bool = False # Add embedding to alow gọi embedding from model llama_cpp
     ) -> None:
         model_kwargs = {
-            **{"n_ctx": context_window, "verbose": verbose},
+            **{"n_ctx": context_window, "verbose": verbose, "embedding":embedding},
             **(model_kwargs or {}),  # Override defaults via model_kwargs
         }
 
@@ -207,6 +162,7 @@ class LlamaCPP(CustomLLM):
             num_output=self.max_new_tokens,
             model_name=self.model_path,
         )
+
 
     def _get_model_path_for_version(self) -> str:
         """Get model path for the current llama-cpp version."""
@@ -296,3 +252,17 @@ class LlamaCPP(CustomLLM):
                 yield CompletionResponse(delta=delta, text=text, raw=response)
 
         return gen()
+
+    """Add embedding"""
+    def embed(self, input: str) -> List[float]:
+        """Embed a string.
+
+        Args:
+            input: The utf-8 encoded string to embed.
+
+        Returns:
+            A list of embeddings
+        """
+        return list(map(float, self._model.create_embedding(input)["data"][0]["embedding"]))
+
+
